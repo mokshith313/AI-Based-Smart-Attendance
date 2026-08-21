@@ -25,5 +25,5 @@ COPY . .
 # Expose port (Render automatically sets $PORT)
 EXPOSE 5000
 
-# Start command using Gunicorn
-CMD gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 1 --threads 4 app:app
+# Start command using Gunicorn bound to 0.0.0.0:$PORT
+CMD gunicorn --bind 0.0.0.0:${PORT:-5000} app:app

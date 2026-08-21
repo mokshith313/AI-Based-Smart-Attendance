@@ -12,7 +12,9 @@ import cv2
 from flask import Flask, render_template, request, jsonify, send_file, Response
 import pymysql
 
-app = Flask(__name__)
+app = Flask(__name__,
+            template_folder=os.path.join(BASE_DIR, 'templates'),
+            static_folder=os.path.join(BASE_DIR, 'static'))
 
 # --- INITIALIZATION ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
