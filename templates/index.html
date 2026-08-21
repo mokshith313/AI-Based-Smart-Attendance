@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Smart Attendance System</title>
+    <meta name="description" content="AI-Based Automated Smart Attendance System with Real-Time Face Recognition">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Top Header Navigation -->
+        <header class="main-header">
+            <div class="brand">
+                <div class="brand-icon">
+                    <i class="fa-solid fa-user-shield"></i>
+                </div>
+                <div class="brand-text">
+                    <h1>VisionAttend <span>AI</span></h1>
+                    <p>Smart Face Recognition Attendance System</p>
+                </div>
+            </div>
+
+            <div class="header-actions">
+                <div class="status-pill" id="system-status-pill">
+                    <span class="pulse-dot green"></span>
+                    <span id="system-status-text">System Active</span>
+                </div>
+                <button class="btn btn-outline" id="btn-refresh-stats">
+                    <i class="fa-solid fa-arrows-rotate"></i> Refresh
+                </button>
+            </div>
+        </header>
+
+        <!-- Stats Overview Cards -->
+        <section class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon blue">
+                    <i class="fa-solid fa-users"></i>
+                </div>
+                <div class="stat-info">
+                    <span class="stat-label">Registered Students</span>
+                    <h3 class="stat-value" id="stat-registered-students">0</h3>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon green">
+                    <i class="fa-solid fa-clipboard-user"></i>
+                </div>
+                <div class="stat-info">
+                    <span class="stat-label">Present Today</span>
+                    <h3 class="stat-value" id="stat-present-today">0</h3>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon purple">
+                    <i class="fa-solid fa-images"></i>
+                </div>
+                <div class="stat-info">
+                    <span class="stat-label">Trained Face Samples</span>
+                    <h3 class="stat-value" id="stat-trained-samples">0</h3>
+                </div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-icon orange">
+                    <i class="fa-solid fa-brain"></i>
+                </div>
+                <div class="stat-info">
+                    <span class="stat-label">AI Model Status</span>
+                    <h3 class="stat-value model-badge" id="stat-model-status">Loading...</h3>
+                </div>
+            </div>
+        </section>
+
+        <!-- Navigation Tabs -->
+        <nav class="nav-tabs">
+            <button class="tab-btn active" data-tab="tab-recognition">
+                <i class="fa-solid fa-camera"></i> Live Attendance
+            </button>
+            <button class="tab-btn" data-tab="tab-register">
+                <i class="fa-solid fa-user-plus"></i> Register Student
+            </button>
+            <button class="tab-btn" data-tab="tab-manual">
+                <i class="fa-solid fa-pen-to-square"></i> Manual Entry
+            </button>
+            <button class="tab-btn" data-tab="tab-logs">
+                <i class="fa-solid fa-table-list"></i> Attendance Logs
+            </button>
+            <button class="tab-btn" data-tab="tab-students">
+                <i class="fa-solid fa-address-book"></i> Student Directory
+            </button>
+        </nav>
+
+        <!-- Notification Banner -->
+        <div id="notification-banner" class="notification hidden">
+            <span id="notification-text">System Ready</span>
+            <button class="close-notif" id="btn-close-notif"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <!-- MAIN CONTENT TABS -->
+        <main class="tab-content-container">
+
+            <!-- TAB 1: Live Recognition & Automatic Attendance -->
+            <div class="tab-panel active" id="tab-recognition">
+                <div class="grid-2col">
+                    <div class="card camera-card">
+                        <div class="card-header">
+                            <h2><i class="fa-solid fa-video"></i> Live Face Scanner</h2>
+                            <div class="camera-controls">
+                                <button class="btn btn-primary" id="btn-toggle-cam">
+                                    <i class="fa-solid fa-play"></i> Start Camera
+                                </button>
+                            </div>
+                        </div>
+                        <div class="camera-viewport">
+                            <video id="webcam-video" autoplay playsinline muted></video>
+                            <canvas id="overlay-canvas"></canvas>
+                            <div class="camera-placeholder" id="cam-placeholder">
+                                <i class="fa-solid fa-camera-retro"></i>
+                                <p>Click "Start Camera" to begin automated face recognition attendance</p>
+                            </div>
+                        </div>
+                        <div class="camera-footer">
+                            <span class="live-tag"><i class="fa-solid fa-circle"></i> Live AI Recognition</span>
+                            <span class="info-text">Position face inside camera box to log attendance</span>
+                        </div>
+                    </div>
+
+                    <div class="card sidebar-card">
+                        <div class="card-header">
+                            <h2><i class="fa-solid fa-bolt"></i> Real-time Detections</h2>
+                            <button class="btn btn-sm btn-outline" id="btn-train-model">
+                                <i class="fa-solid fa-gears"></i> Retrain Model
+                            </button>
+                        </div>
+                        
+                        <div class="recognition-feed" id="recognition-feed">
+                            <div class="empty-state">
+                                <i class="fa-solid fa-face-smile"></i>
+                                <p>Start camera to see live recognition results here</p>
+                            </div>
+                        </div>
+
+                        <div class="card-section mt-auto">
+                            <h3><i class="fa-solid fa-clock-rotate-left"></i> Today's Live Attendance Feed</h3>
+                            <div class="mini-logs-list" id="mini-attendance-list">
+                                <p class="text-muted">No attendance marked yet today</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: Register Student & Take Images -->
+            <div class="tab-panel" id="tab-register">
+                <div class="grid-2col">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2><i class="fa-solid fa-id-card"></i> Student Information</h2>
+                        </div>
+                        <form id="form-register-student" class="styled-form">
+                            <div class="form-group">
+                                <label for="reg-enrollment">Enrollment / ID Number <span class="required">*</span></label>
+                                <input type="text" id="reg-enrollment" placeholder="e.g. 101, CS202401" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="reg-name">Full Student Name <span class="required">*</span></label>
+                                <input type="text" id="reg-name" placeholder="e.g. Mokshith Reddy" required>
+                            </div>
+
+                            <div class="capture-progress-container hidden" id="capture-progress-wrap">
+                                <div class="progress-info">
+                                    <span>Capturing Face Samples...</span>
+                                    <strong id="capture-count-text">0 / 15</strong>
+                                </div>
+                                <div class="progress-bar-bg">
+                                    <div class="progress-bar-fill" id="capture-progress-bar"></div>
+                                </div>
+                            </div>
+
+                            <div class="form-actions">
+                                <button type="button" class="btn btn-secondary" id="btn-start-reg-cam">
+                                    <i class="fa-solid fa-camera"></i> Open Camera
+                                </button>
+                                <button type="button" class="btn btn-success" id="btn-capture-faces" disabled>
+                                    <i class="fa-solid fa-user-check"></i> Capture Faces & Register
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h2><i class="fa-solid fa-camera-rotate"></i> Face Capture Preview</h2>
+                        </div>
+                        <div class="camera-viewport small">
+                            <video id="reg-webcam-video" autoplay playsinline muted></video>
+                            <div class="camera-placeholder" id="reg-cam-placeholder">
+                                <i class="fa-solid fa-user-viewfinder"></i>
+                                <p>Click "Open Camera" to capture student training photos</p>
+                            </div>
+                        </div>
+                        <div class="captured-grid" id="captured-thumbnails">
+                            <!-- Thumbnails of captured face samples appear here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: Manual Attendance -->
+            <div class="tab-panel" id="tab-manual">
+                <div class="card max-w-600 center-card">
+                    <div class="card-header">
+                        <h2><i class="fa-solid fa-user-pen"></i> Mark Manual Attendance</h2>
+                    </div>
+                    <form id="form-manual-attendance" class="styled-form">
+                        <div class="form-group">
+                            <label for="man-enrollment">Enrollment Number <span class="required">*</span></label>
+                            <input type="text" id="man-enrollment" placeholder="Enter Enrollment ID" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="man-name">Student Name <span class="required">*</span></label>
+                            <input type="text" id="man-name" placeholder="Enter Student Name" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">
+                            <i class="fa-solid fa-check"></i> Submit Manual Attendance
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- TAB 4: Attendance Logs -->
+            <div class="tab-panel" id="tab-logs">
+                <div class="card">
+                    <div class="card-header flex-between">
+                        <h2><i class="fa-solid fa-table-list"></i> Attendance Records</h2>
+                        <div class="filter-actions">
+                            <input type="date" id="attendance-date-picker" class="input-date">
+                            <button class="btn btn-outline" id="btn-fetch-logs">
+                                <i class="fa-solid fa-filter"></i> View Date
+                            </button>
+                            <button class="btn btn-success" id="btn-export-csv">
+                                <i class="fa-solid fa-file-csv"></i> Export CSV
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="data-table" id="table-attendance">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Enrollment</th>
+                                    <th>Student Name</th>
+                                    <th>Date</th>
+                                    <th>Time</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-attendance">
+                                <tr>
+                                    <td colspan="6" class="text-center py-4">Loading attendance records...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 5: Student Directory -->
+            <div class="tab-panel" id="tab-students">
+                <div class="card">
+                    <div class="card-header flex-between">
+                        <h2><i class="fa-solid fa-users"></i> Registered Students Directory</h2>
+                        <button class="btn btn-primary" id="btn-train-model-sec">
+                            <i class="fa-solid fa-brain"></i> Train AI Recognition Model
+                        </button>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="data-table" id="table-students">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Enrollment</th>
+                                    <th>Student Name</th>
+                                    <th>Registration Date</th>
+                                    <th>Time</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-students">
+                                <tr>
+                                    <td colspan="5" class="text-center py-4">Loading student directory...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Script File -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

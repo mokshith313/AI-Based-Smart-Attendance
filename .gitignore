@@ -1,0 +1,25 @@
+# Python / Byte-compiled / optimized files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# PyInstaller / Build outputs
+build/
+dist/
+*.spec
+
+# Virtual Environments
+venv/
+env/
+ENV/
+.venv/
+
+# Environment Variables
+.env
+
+# System & OS Files
+.DS_Store
+Thumbs.db
+
+# Temporary attendance upload caches (keep folders, ignore temporary raw files if needed)
+*.tmp
