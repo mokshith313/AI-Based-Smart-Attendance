@@ -1,3 +1,8 @@
+/**
+ * VisionAttend AI - Frontend Application Controller
+ * Real-Time Face Recognition, Attendance Logging, and Dashboard UI
+ */
+
 document.addEventListener('DOMContentLoaded', () => {
     // --- APP STATE ---
     let activeWebcamStream = null;
@@ -6,14 +11,63 @@ document.addEventListener('DOMContentLoaded', () => {
     let recognitionInterval = null;
     let capturedFrames = [];
 
+    // Cache of fetched records for instant client-side searching
+    let cachedAttendanceRecords = [];
+    let cachedStudentDirectory = [];
+
+    // Audio Chime Synthesizer Context (Web Audio API)
+    let audioCtx = null;
+    function playVerificationChime() {
+        try {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            // Double-tone pleasant success chord (E5 -> G#5)
+            const now = audioCtx.currentTime;
+            
+            const osc1 = audioCtx.createOscillator();
+            const gain1 = audioCtx.createGain();
+            osc1.type = 'sine';
+            osc1.frequency.setValueAtTime(659.25, now); // E5
+            gain1.gain.setValueAtTime(0.12, now);
+            gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+            osc1.connect(gain1);
+            gain1.connect(audioCtx.destination);
+            osc1.start(now);
+            osc1.stop(now + 0.25);
+
+            const osc2 = audioCtx.createOscillator();
+            const gain2 = audioCtx.createGain();
+            osc2.type = 'sine';
+            osc2.frequency.setValueAtTime(830.61, now + 0.1); // G#5
+            gain2.gain.setValueAtTime(0.15, now + 0.1);
+            gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+            osc2.connect(gain2);
+            gain2.connect(audioCtx.destination);
+            osc2.start(now + 0.1);
+            osc2.stop(now + 0.4);
+        } catch (e) {
+            // Audio not supported or blocked by browser policy
+        }
+    }
+
     // --- DOM ELEMENTS ---
     const tabButtons = document.querySelectorAll('.tab-btn');
     const tabPanels = document.querySelectorAll('.tab-panel');
 
+    const toastContainer = document.getElementById('toast-container');
     const notificationBanner = document.getElementById('notification-banner');
     const notificationText = document.getElementById('notification-text');
     const btnCloseNotif = document.getElementById('btn-close-notif');
 
+    // Header Clock Elements
+    const clockTimeElem = document.getElementById('clock-time');
+    const clockDateElem = document.getElementById('clock-date');
+
+    // Stats Elements
     const statRegistered = document.getElementById('stat-registered-students');
     const statPresent = document.getElementById('stat-present-today');
     const statTrained = document.getElementById('stat-trained-samples');
@@ -25,6 +79,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const webcamVideo = document.getElementById('webcam-video');
     const overlayCanvas = document.getElementById('overlay-canvas');
     const camPlaceholder = document.getElementById('cam-placeholder');
+    const camViewportContainer = document.getElementById('cam-viewport-container');
+    const hudCamStatus = document.getElementById('hud-cam-status');
     const recognitionFeed = document.getElementById('recognition-feed');
     const miniAttendanceList = document.getElementById('mini-attendance-list');
     const btnTrainModel = document.getElementById('btn-train-model');
@@ -48,18 +104,106 @@ document.addEventListener('DOMContentLoaded', () => {
     const inputManEnrollment = document.getElementById('man-enrollment');
     const inputManName = document.getElementById('man-name');
 
-    // Tab 4 Elements (Logs)
+    // Tab 4 Elements (Attendance Logs)
     const attendanceDatePicker = document.getElementById('attendance-date-picker');
     const btnFetchLogs = document.getElementById('btn-fetch-logs');
     const btnExportCsv = document.getElementById('btn-export-csv');
     const tbodyAttendance = document.getElementById('tbody-attendance');
+    const inputSearchLogs = document.getElementById('input-search-logs');
+    const logsCountChip = document.getElementById('logs-count-chip');
 
-    // Tab 5 Elements (Students)
+    // Tab 5 Elements (Student Directory)
     const tbodyStudents = document.getElementById('tbody-students');
+    const inputSearchStudents = document.getElementById('input-search-students');
+    const studentsCountChip = document.getElementById('students-count-chip');
 
-    // Set today's date in datepicker
+    // Date Picker Default Today
     const todayISO = new Date().toISOString().split('T')[0];
     if (attendanceDatePicker) attendanceDatePicker.value = todayISO;
+
+    // --- DIGITAL CLOCK SYSTEM ---
+    function updateClock() {
+        const now = new Date();
+        if (clockTimeElem) {
+            clockTimeElem.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+        if (clockDateElem) {
+            clockDateElem.textContent = now.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+        }
+    }
+    updateClock();
+    setInterval(updateClock, 1000);
+
+    // --- AVATAR INITIALS HELPER ---
+    function getInitials(name) {
+        if (!name || name === 'Unknown' || name === 'Unknown Face') return '?';
+        const parts = name.trim().split(/\s+/);
+        if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+        return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+
+    // --- TOAST NOTIFICATION ENGINE ---
+    function showNotification(message, type = 'info') {
+        // Fallback banner element compatibility
+        if (notificationText && notificationBanner) {
+            notificationText.textContent = message;
+            notificationBanner.className = `notification ${type}`;
+        }
+
+        // Modern floating toast stack
+        if (!toastContainer) return;
+
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+
+        let iconClass = 'fa-info-circle';
+        let title = 'Information';
+        if (type === 'success') {
+            iconClass = 'fa-circle-check';
+            title = 'Success';
+        } else if (type === 'error') {
+            iconClass = 'fa-circle-exclamation';
+            title = 'Attention Required';
+        } else if (type === 'warning') {
+            iconClass = 'fa-triangle-exclamation';
+            title = 'Notice';
+        }
+
+        toast.innerHTML = `
+            <i class="fa-solid ${iconClass} toast-icon"></i>
+            <div class="toast-content">
+                <div class="toast-title">${title}</div>
+                <div class="toast-message">${message}</div>
+            </div>
+            <button class="toast-close" aria-label="Close Notification">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        `;
+
+        const closeBtn = toast.querySelector('.toast-close');
+        closeBtn.addEventListener('click', () => removeToast(toast));
+
+        toastContainer.appendChild(toast);
+
+        // Auto remove after 4.5 seconds
+        const timeout = setTimeout(() => {
+            removeToast(toast);
+        }, 4500);
+
+        function removeToast(el) {
+            clearTimeout(timeout);
+            el.classList.add('removing');
+            setTimeout(() => {
+                if (el.parentNode) el.parentNode.removeChild(el);
+            }, 300);
+        }
+    }
+
+    if (btnCloseNotif) {
+        btnCloseNotif.addEventListener('click', () => {
+            notificationBanner.classList.add('hidden');
+        });
+    }
 
     // --- INITIALIZATION ---
     fetchStats();
@@ -75,29 +219,13 @@ document.addEventListener('DOMContentLoaded', () => {
             tabPanels.forEach(p => p.classList.remove('active'));
 
             btn.classList.add('active');
-            document.getElementById(targetTab).classList.add('active');
+            const targetPanel = document.getElementById(targetTab);
+            if (targetPanel) targetPanel.classList.add('active');
 
             if (targetTab === 'tab-logs') fetchAttendanceLogs(attendanceDatePicker.value);
             if (targetTab === 'tab-students') fetchStudentDirectory();
         });
     });
-
-    // --- NOTIFICATION HELPER ---
-    function showNotification(message, type = 'info') {
-        notificationText.textContent = message;
-        notificationBanner.className = `notification ${type}`;
-        notificationBanner.classList.remove('hidden');
-
-        setTimeout(() => {
-            notificationBanner.classList.add('hidden');
-        }, 6000);
-    }
-
-    if (btnCloseNotif) {
-        btnCloseNotif.addEventListener('click', () => {
-            notificationBanner.classList.add('hidden');
-        });
-    }
 
     // --- STATS FETCHING ---
     async function fetchStats() {
@@ -105,15 +233,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const res = await fetch('/api/stats');
             const data = await res.json();
             if (data.success) {
-                statRegistered.textContent = data.total_students;
-                statPresent.textContent = data.today_present;
-                statTrained.textContent = data.trained_images_count;
-                if (data.model_ready) {
-                    statModelStatus.textContent = "Ready";
-                    statModelStatus.className = "stat-value model-badge";
-                } else {
-                    statModelStatus.textContent = "Not Trained";
-                    statModelStatus.className = "stat-value text-muted";
+                if (statRegistered) statRegistered.textContent = data.total_students;
+                if (statPresent) statPresent.textContent = data.today_present;
+                if (statTrained) statTrained.textContent = data.trained_images_count;
+                if (statModelStatus) {
+                    if (data.model_ready) {
+                        statModelStatus.innerHTML = '<i class="fa-solid fa-circle-check"></i> Trained & Ready';
+                        statModelStatus.className = "stat-value model-badge";
+                    } else {
+                        statModelStatus.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Untrained';
+                        statModelStatus.className = "stat-value model-badge not-trained";
+                    }
                 }
             }
         } catch (err) {
@@ -126,7 +256,7 @@ document.addEventListener('DOMContentLoaded', () => {
             fetchStats();
             fetchTodayLogs();
             fetchStudentDirectory();
-            showNotification('Dashboard refreshed', 'success');
+            showNotification('Dashboard statistics updated', 'info');
         });
     }
 
@@ -148,14 +278,20 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             webcamVideo.srcObject = activeWebcamStream;
             camPlaceholder.classList.add('hidden');
+            if (camViewportContainer) camViewportContainer.classList.add('scanning');
+
+            if (hudCamStatus) {
+                hudCamStatus.className = 'hud-live-badge active';
+                hudCamStatus.innerHTML = '<span class="pulse-dot green"></span><span>CAM LIVE</span>';
+            }
 
             isRecognizing = true;
-            btnToggleCam.innerHTML = '<i class="fa-solid fa-stop"></i> Stop Camera';
-            btnToggleCam.className = 'btn btn-secondary';
+            btnToggleCam.innerHTML = '<i class="fa-solid fa-stop"></i> Stop Scanner';
+            btnToggleCam.className = 'btn btn-danger';
 
-            // Start sending frames to backend recognizer
+            // Start sending frames to backend recognizer every 600ms
             recognitionInterval = setInterval(processRecognitionFrame, 600);
-            showNotification('Live camera scanning activated', 'success');
+            showNotification('Live face scanner activated', 'success');
         } catch (err) {
             console.error('Camera access error:', err);
             showNotification('Cannot access webcam: ' + err.message, 'error');
@@ -171,6 +307,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         webcamVideo.srcObject = null;
         camPlaceholder.classList.remove('hidden');
+        if (camViewportContainer) camViewportContainer.classList.remove('scanning');
+
+        if (hudCamStatus) {
+            hudCamStatus.className = 'hud-live-badge inactive';
+            hudCamStatus.innerHTML = '<span class="pulse-dot green"></span><span>CAM STANDBY</span>';
+        }
+
         clearCanvasOverlay();
 
         isRecognizing = false;
@@ -226,36 +369,107 @@ document.addEventListener('DOMContentLoaded', () => {
 
         faces.forEach(face => {
             const [x, y, w, h] = face.bbox;
-            const rx = x * scaleX;
+            // Video has scaleX(-1) for mirror view, so mirror X coordinates for overlay canvas
+            const mirroredX = videoW - (x + w);
+            const rx = mirroredX * scaleX;
             const ry = y * scaleY;
             const rw = w * scaleX;
             const rh = h * scaleY;
 
-            ctx.lineWidth = 3;
+            let strokeColor = '#f43f5e'; // red
+            let fillColor = 'rgba(244, 63, 94, 0.12)';
+            let tagColor = '#f43f5e';
+
             if (face.is_known) {
-                ctx.strokeStyle = face.is_marked ? '#10b981' : '#3b82f6';
-                ctx.fillStyle = face.is_marked ? 'rgba(16, 185, 129, 0.2)' : 'rgba(59, 130, 246, 0.2)';
-            } else {
-                ctx.strokeStyle = '#ef4444';
-                ctx.fillStyle = 'rgba(239, 68, 68, 0.2)';
+                if (face.is_marked) {
+                    strokeColor = '#10b981'; // emerald
+                    fillColor = 'rgba(16, 185, 129, 0.15)';
+                    tagColor = '#10b981';
+                } else {
+                    strokeColor = '#6366f1'; // indigo
+                    fillColor = 'rgba(99, 102, 241, 0.15)';
+                    tagColor = '#6366f1';
+                }
             }
 
-            ctx.fillRect(rx, ry, rw, rh);
-            ctx.strokeRect(rx, ry, rw, rh);
+            // Draw bounding box with rounded corners
+            ctx.lineWidth = 2.5;
+            ctx.strokeStyle = strokeColor;
+            ctx.fillStyle = fillColor;
 
-            // Text Label Box
-            const label = face.is_known ? `${face.name} (${face.accuracy}%)` : 'Unknown Face';
-            ctx.font = 'bold 14px Outfit, sans-serif';
-            const textWidth = ctx.measureText(label).width;
+            const radius = 8;
+            ctx.beginPath();
+            ctx.moveTo(rx + radius, ry);
+            ctx.lineTo(rx + rw - radius, ry);
+            ctx.quadraticCurveTo(rx + rw, ry, rx + rw, ry + radius);
+            ctx.lineTo(rx + rw, ry + rh - radius);
+            ctx.quadraticCurveTo(rx + rw, ry + rh, rx + rw - radius, ry + rh);
+            ctx.lineTo(rx + radius, ry + rh);
+            ctx.quadraticCurveTo(rx, ry + rh, rx, ry + rh - radius);
+            ctx.lineTo(rx, ry + radius);
+            ctx.quadraticCurveTo(rx, ry, rx + radius, ry);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
 
-            ctx.fillStyle = face.is_known ? (face.is_marked ? '#10b981' : '#3b82f6') : '#ef4444';
-            ctx.fillRect(rx, ry - 28 > 0 ? ry - 28 : ry, textWidth + 16, 26);
+            // Tactical Corner Accents
+            const cornerLen = 14;
+            ctx.lineWidth = 3.5;
+            ctx.strokeStyle = strokeColor;
+            
+            // Top Left Corner
+            ctx.beginPath();
+            ctx.moveTo(rx, ry + cornerLen);
+            ctx.lineTo(rx, ry);
+            ctx.lineTo(rx + cornerLen, ry);
+            ctx.stroke();
 
+            // Top Right Corner
+            ctx.beginPath();
+            ctx.moveTo(rx + rw - cornerLen, ry);
+            ctx.lineTo(rx + rw, ry);
+            ctx.lineTo(rx + rw, ry + cornerLen);
+            ctx.stroke();
+
+            // Bottom Left Corner
+            ctx.beginPath();
+            ctx.moveTo(rx, ry + rh - cornerLen);
+            ctx.lineTo(rx, ry + rh);
+            ctx.lineTo(rx + cornerLen, ry + rh);
+            ctx.stroke();
+
+            // Bottom Right Corner
+            ctx.beginPath();
+            ctx.moveTo(rx + rw - cornerLen, ry + rh);
+            ctx.lineTo(rx + rw, ry + rh);
+            ctx.lineTo(rx + rw, ry + rh - cornerLen);
+            ctx.stroke();
+
+            // Label Tag Pill
+            const label = face.is_known 
+                ? `${face.name} • ${face.accuracy}%` 
+                : 'Unknown Face';
+            
+            ctx.font = '600 13px Outfit, sans-serif';
+            const textMetrics = ctx.measureText(label);
+            const tagW = textMetrics.width + 20;
+            const tagH = 26;
+            const tagY = ry - tagH - 4 > 4 ? ry - tagH - 4 : ry + rh + 4;
+
+            // Draw Tag Background
+            ctx.fillStyle = tagColor;
+            ctx.beginPath();
+            ctx.roundRect(rx, tagY, tagW, tagH, 6);
+            ctx.fill();
+
+            // Draw Tag Text
             ctx.fillStyle = '#ffffff';
-            ctx.fillText(label, rx + 8, ry - 28 > 0 ? ry - 10 : ry + 18);
+            ctx.fillText(label, rx + 10, tagY + 18);
 
+            // Trigger attendance celebration if just marked
             if (face.just_marked) {
-                showNotification(`Attendance Recorded for ${face.name}!`, 'success');
+                playVerificationChime();
+                showNotification(`Verified & Recorded: ${face.name}!`, 'success');
                 fetchStats();
                 fetchTodayLogs();
             }
@@ -267,26 +481,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let feedHtml = '';
         faces.forEach(face => {
+            const avatarInitials = getInitials(face.name);
             if (face.is_known) {
                 feedHtml += `
                     <div class="feed-item ${face.is_marked ? 'marked' : ''}">
-                        <div>
-                            <div class="feed-name">${face.name}</div>
-                            <div class="feed-meta">ID: ${face.enrollment} &bull; Accuracy: ${face.accuracy}%</div>
+                        <div class="feed-info">
+                            <div class="feed-avatar">${avatarInitials}</div>
+                            <div>
+                                <div class="feed-name">${face.name}</div>
+                                <div class="feed-meta">ID: <strong>${face.enrollment}</strong> &bull; Match: ${face.accuracy}%</div>
+                            </div>
                         </div>
-                        <span class="feed-badge ${face.is_marked ? 'success' : ''}">
-                            ${face.is_marked ? '<i class="fa-solid fa-check"></i> Present' : 'Detected'}
+                        <span class="feed-badge ${face.is_marked ? 'success' : 'detecting'}">
+                            ${face.is_marked ? '<i class="fa-solid fa-check"></i> Present' : '<i class="fa-solid fa-crosshairs"></i> Tracking'}
                         </span>
                     </div>
                 `;
             } else {
                 feedHtml += `
                     <div class="feed-item">
-                        <div>
-                            <div class="feed-name">Unknown Face</div>
-                            <div class="feed-meta">Unrecognized sample</div>
+                        <div class="feed-info">
+                            <div class="feed-avatar unknown">?</div>
+                            <div>
+                                <div class="feed-name">Unknown Face</div>
+                                <div class="feed-meta">No profile matched &bull; ${face.accuracy}% match</div>
+                            </div>
                         </div>
-                        <span class="feed-badge unknown">Unknown</span>
+                        <span class="feed-badge unknown">Unregistered</span>
                     </div>
                 `;
             }
@@ -301,18 +522,24 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await res.json();
             if (data.success && data.records) {
                 if (data.records.length === 0) {
-                    miniAttendanceList.innerHTML = '<p class="text-muted">No attendance marked yet today</p>';
+                    miniAttendanceList.innerHTML = '<p class="text-muted text-center py-4">No attendance marked yet today</p>';
                     return;
                 }
 
                 let html = '';
-                // Render last 5 entries
-                const recent = data.records.slice(-5).reverse();
+                // Render last 6 entries in reverse chronological order
+                const recent = data.records.slice(-6).reverse();
                 recent.forEach(item => {
+                    const initials = getInitials(item.Name);
                     html += `
                         <div class="mini-log-item">
-                            <span><strong>${item.Name}</strong> (${item.Enrollment})</span>
-                            <span class="text-muted">${item.Time}</span>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <div class="row-avatar" style="width: 28px; height: 28px; font-size: 11px;">${initials}</div>
+                                <span><strong>${item.Name}</strong> <span class="text-muted">(${item.Enrollment})</span></span>
+                            </div>
+                            <span class="status-badge present" style="font-size: 11px; padding: 2px 8px;">
+                                <i class="fa-solid fa-clock"></i> ${item.Time}
+                            </span>
                         </div>
                     `;
                 });
@@ -356,11 +583,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function startRegCamera() {
         try {
-            regWebcamStream = await navigator.mediaDevices.getUserMedia({ video: true });
+            regWebcamStream = await navigator.mediaDevices.getUserMedia({ 
+                video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" } 
+            });
             regWebcamVideo.srcObject = regWebcamStream;
             regCamPlaceholder.classList.add('hidden');
 
             btnStartRegCam.innerHTML = '<i class="fa-solid fa-stop"></i> Close Camera';
+            btnStartRegCam.className = 'btn btn-secondary';
             btnCaptureFaces.disabled = false;
         } catch (err) {
             showNotification('Cannot access camera: ' + err.message, 'error');
@@ -376,6 +606,7 @@ document.addEventListener('DOMContentLoaded', () => {
         regCamPlaceholder.classList.remove('hidden');
 
         btnStartRegCam.innerHTML = '<i class="fa-solid fa-camera"></i> Open Camera';
+        btnStartRegCam.className = 'btn btn-secondary';
         btnCaptureFaces.disabled = true;
     }
 
@@ -410,14 +641,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 capturedFrames.push(frameData);
 
                 // Add thumbnail preview
-                if (i <= 8) {
+                if (i <= 10) {
                     const imgThumb = document.createElement('img');
                     imgThumb.src = frameData;
                     imgThumb.className = 'captured-thumb';
                     capturedThumbnails.appendChild(imgThumb);
                 }
 
-                await new Promise(r => setTimeout(r, 120)); // delay between captures
+                await new Promise(r => setTimeout(r, 120)); // Delay between captures
             }
 
             // Submit registration payload
@@ -447,7 +678,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (confirm('Student registered! Would you like to retrain the AI model now?')) {
                             triggerModelTraining();
                         }
-                    }, 500);
+                    }, 400);
                 } else {
                     showNotification('Registration error: ' + data.error, 'error');
                 }
@@ -479,6 +710,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await res.json();
                 if (data.success) {
                     showNotification(data.message, 'success');
+                    playVerificationChime();
                     inputManEnrollment.value = '';
                     inputManName.value = '';
                     fetchStats();
@@ -492,37 +724,72 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- TAB 4: ATTENDANCE LOGS TABLE & CSV ---
+    // --- TAB 4: ATTENDANCE LOGS TABLE & LIVE FILTERING ---
     async function fetchAttendanceLogs(dateStr) {
         try {
-            tbodyAttendance.innerHTML = '<tr><td colspan="6" class="text-center py-4">Fetching records...</td></tr>';
+            tbodyAttendance.innerHTML = '<tr><td colspan="6" class="text-center py-4"><i class="fa-solid fa-spinner fa-spin"></i> Fetching records...</td></tr>';
             const res = await fetch(`/api/attendance?date=${dateStr}`);
             const data = await res.json();
 
             if (data.success && data.records) {
-                if (data.records.length === 0) {
-                    tbodyAttendance.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-muted">No attendance entries found for ${dateStr}</td></tr>`;
-                    return;
-                }
-
-                let html = '';
-                data.records.forEach((row, idx) => {
-                    html += `
-                        <tr>
-                            <td>${idx + 1}</td>
-                            <td><strong>${row.Enrollment}</strong></td>
-                            <td>${row.Name}</td>
-                            <td>${row.Date}</td>
-                            <td>${row.Time}</td>
-                            <td><span class="status-badge present"><i class="fa-solid fa-check"></i> Present</span></td>
-                        </tr>
-                    `;
-                });
-                tbodyAttendance.innerHTML = html;
+                cachedAttendanceRecords = data.records;
+                renderAttendanceLogsTable(cachedAttendanceRecords);
             }
         } catch (err) {
             tbodyAttendance.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">Failed to load attendance logs</td></tr>';
         }
+    }
+
+    function renderAttendanceLogsTable(records) {
+        if (logsCountChip) {
+            logsCountChip.textContent = `${records.length} Record${records.length === 1 ? '' : 's'}`;
+        }
+
+        if (records.length === 0) {
+            tbodyAttendance.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-muted"><i class="fa-solid fa-folder-open" style="font-size: 24px; display: block; margin-bottom: 8px;"></i> No attendance entries found for selected criteria</td></tr>`;
+            return;
+        }
+
+        let html = '';
+        records.forEach((row, idx) => {
+            const initials = getInitials(row.Name);
+            html += `
+                <tr>
+                    <td><strong class="text-muted">${idx + 1}</strong></td>
+                    <td><code style="color: var(--accent-indigo-light); font-weight: 600;">${row.Enrollment}</code></td>
+                    <td>
+                        <div class="student-row-cell">
+                            <div class="row-avatar">${initials}</div>
+                            <strong>${row.Name}</strong>
+                        </div>
+                    </td>
+                    <td>${row.Date}</td>
+                    <td><span class="text-muted"><i class="fa-regular fa-clock"></i> ${row.Time}</span></td>
+                    <td>
+                        <span class="status-badge present">
+                            <i class="fa-solid fa-check"></i> Present
+                        </span>
+                    </td>
+                </tr>
+            `;
+        });
+        tbodyAttendance.innerHTML = html;
+    }
+
+    // Real-Time Search Filter on Attendance Logs
+    if (inputSearchLogs) {
+        inputSearchLogs.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase().trim();
+            if (!query) {
+                renderAttendanceLogsTable(cachedAttendanceRecords);
+                return;
+            }
+            const filtered = cachedAttendanceRecords.filter(r => 
+                String(r.Enrollment).toLowerCase().includes(query) ||
+                String(r.Name).toLowerCase().includes(query)
+            );
+            renderAttendanceLogsTable(filtered);
+        });
     }
 
     if (btnFetchLogs) {
@@ -538,35 +805,66 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- TAB 5: STUDENT DIRECTORY TABLE ---
+    // --- TAB 5: STUDENT DIRECTORY & LIVE SEARCH ---
     async function fetchStudentDirectory() {
         try {
-            tbodyStudents.innerHTML = '<tr><td colspan="5" class="text-center py-4">Fetching registered students...</td></tr>';
+            tbodyStudents.innerHTML = '<tr><td colspan="5" class="text-center py-4"><i class="fa-solid fa-spinner fa-spin"></i> Fetching registered students...</td></tr>';
             const res = await fetch('/api/students');
             const data = await res.json();
 
             if (data.success && data.students) {
-                if (data.students.length === 0) {
-                    tbodyStudents.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">No registered students yet</td></tr>';
-                    return;
-                }
-
-                let html = '';
-                data.students.forEach((s, idx) => {
-                    html += `
-                        <tr>
-                            <td>${idx + 1}</td>
-                            <td><strong>${s.Enrollment}</strong></td>
-                            <td>${s.Name}</td>
-                            <td>${s.Date || 'N/A'}</td>
-                            <td>${s.Time || 'N/A'}</td>
-                        </tr>
-                    `;
-                });
-                tbodyStudents.innerHTML = html;
+                cachedStudentDirectory = data.students;
+                renderStudentDirectoryTable(cachedStudentDirectory);
             }
         } catch (err) {
             tbodyStudents.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">Failed to load student directory</td></tr>';
         }
+    }
+
+    function renderStudentDirectoryTable(students) {
+        if (studentsCountChip) {
+            studentsCountChip.textContent = `${students.length} Student${students.length === 1 ? '' : 's'}`;
+        }
+
+        if (students.length === 0) {
+            tbodyStudents.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted"><i class="fa-solid fa-user-slash" style="font-size: 24px; display: block; margin-bottom: 8px;"></i> No students found matching criteria</td></tr>';
+            return;
+        }
+
+        let html = '';
+        students.forEach((s, idx) => {
+            const initials = getInitials(s.Name);
+            html += `
+                <tr>
+                    <td><strong class="text-muted">${idx + 1}</strong></td>
+                    <td><code style="color: var(--accent-indigo-light); font-weight: 600;">${s.Enrollment}</code></td>
+                    <td>
+                        <div class="student-row-cell">
+                            <div class="row-avatar">${initials}</div>
+                            <strong>${s.Name}</strong>
+                        </div>
+                    </td>
+                    <td>${s.Date || 'N/A'}</td>
+                    <td><span class="text-muted">${s.Time || 'N/A'}</span></td>
+                </tr>
+            `;
+        });
+        tbodyStudents.innerHTML = html;
+    }
+
+    // Real-Time Search Filter on Student Directory
+    if (inputSearchStudents) {
+        inputSearchStudents.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase().trim();
+            if (!query) {
+                renderStudentDirectoryTable(cachedStudentDirectory);
+                return;
+            }
+            const filtered = cachedStudentDirectory.filter(s => 
+                String(s.Enrollment).toLowerCase().includes(query) ||
+                String(s.Name).toLowerCase().includes(query)
+            );
+            renderStudentDirectoryTable(filtered);
+        });
     }
 });

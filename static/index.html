@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Resume Screener - AI Recruitment Dashboard</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-slate-800/80 backdrop-blur border-b border-slate-700 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-indigo-600 p-2.5 rounded-xl shadow-lg shadow-indigo-500/20">
+                    <i class="fa-solid fa-file-signature text-xl text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight text-white">Smart Resume Screener</h1>
+                    <p class="text-xs text-slate-400">AI-Powered Candidate Parsing & Semantic Match Scoring</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-3">
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Engine Ready
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        
+        <!-- Top Section: Job Description & Resume Upload -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            
+            <!-- Card 1: Job Description Input -->
+            <div class="bg-slate-800 border border-slate-700/80 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+                <div>
+                    <div class="flex justify-between items-center mb-4">
+                        <div class="flex items-center space-x-2">
+                            <i class="fa-solid fa-briefcase text-indigo-400"></i>
+                            <h2 class="text-lg font-semibold text-white">1. Job Description</h2>
+                        </div>
+                        <button onclick="loadPresetJD()" class="text-xs bg-slate-700 hover:bg-slate-600 text-indigo-300 px-3 py-1.5 rounded-lg border border-slate-600 transition">
+                            <i class="fa-solid fa-magic-wand-sparkles mr-1"></i> Load Sample JD
+                        </button>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Select Active Job or Enter New Title</label>
+                            <div class="flex space-x-2">
+                                <select id="jobSelect" onchange="onJobSelected()" class="bg-slate-900 border border-slate-700 text-slate-200 text-sm rounded-lg block w-full p-2.5 focus:ring-indigo-500 focus:border-indigo-500">
+                                    <option value="">-- Select Saved Job --</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Job Title</label>
+                            <input type="text" id="jobTitle" placeholder="e.g. Senior Software Engineer" class="bg-slate-900 border border-slate-700 text-slate-200 text-sm rounded-lg block w-full p-2.5 focus:ring-indigo-500 focus:border-indigo-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Job Description & Requirements Text</label>
+                            <textarea id="jobText" rows="6" placeholder="Paste requirements, required skills, experience, and responsibilities here..." class="bg-slate-900 border border-slate-700 text-slate-200 text-sm rounded-lg block w-full p-2.5 focus:ring-indigo-500 focus:border-indigo-500 font-mono text-xs"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 pt-4 border-t border-slate-700/60 flex justify-between items-center">
+                    <span id="jobStatusMsg" class="text-xs text-slate-400"></span>
+                    <button onclick="saveJobDescription()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm px-4 py-2 rounded-xl shadow-lg shadow-indigo-600/30 transition flex items-center gap-2">
+                        <i class="fa-solid fa-floppy-disk"></i> Save Job Description
+                    </button>
+                </div>
+            </div>
+
+            <!-- Card 2: Batch Resume Upload -->
+            <div class="bg-slate-800 border border-slate-700/80 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+                <div>
+                    <div class="flex justify-between items-center mb-4">
+                        <div class="flex items-center space-x-2">
+                            <i class="fa-solid fa-cloud-arrow-up text-indigo-400"></i>
+                            <h2 class="text-lg font-semibold text-white">2. Upload Resumes (PDF / Text)</h2>
+                        </div>
+                        <span class="text-xs bg-indigo-500/10 text-indigo-300 px-2.5 py-1 rounded-md border border-indigo-500/20">Batch Ingestion</span>
+                    </div>
+
+                    <div class="space-y-4">
+                        <!-- Dropzone -->
+                        <div id="dropzone" onclick="document.getElementById('fileInput').click()" class="border-2 border-dashed border-slate-600 hover:border-indigo-500 bg-slate-900/60 hover:bg-slate-900 rounded-xl p-8 text-center cursor-pointer transition flex flex-col items-center justify-center min-h-[180px]">
+                            <i class="fa-solid fa-folder-open text-4xl text-slate-500 mb-3"></i>
+                            <p class="text-sm font-medium text-slate-300">Click to upload or drag & drop resumes</p>
+                            <p class="text-xs text-slate-500 mt-1">Supports PDF & Plain Text files (.pdf, .txt)</p>
+                            <input type="file" id="fileInput" multiple accept=".pdf,.txt,.text" class="hidden" onchange="handleFileSelect(event)">
+                        </div>
+
+                        <!-- File list display -->
+                        <div id="selectedFilesContainer" class="hidden space-y-2 max-h-32 overflow-y-auto pr-1">
+                            <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Selected Files:</h3>
+                            <div id="selectedFilesList" class="space-y-1.5 text-xs text-slate-300"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 pt-4 border-t border-slate-700/60 flex justify-between items-center">
+                    <span id="uploadStatus" class="text-xs text-slate-400">No files uploaded yet</span>
+                    <button onclick="uploadResumes()" id="uploadBtn" class="bg-slate-700 hover:bg-slate-600 text-white font-medium text-sm px-4 py-2 rounded-xl transition flex items-center gap-2" disabled>
+                        <i class="fa-solid fa-file-import"></i> Upload & Extract Data
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Control Banner -->
+        <div class="bg-gradient-to-r from-indigo-900/60 to-purple-900/60 border border-indigo-500/30 rounded-2xl p-6 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center space-x-4">
+                <div class="bg-indigo-500/20 p-3 rounded-xl border border-indigo-400/30 text-indigo-300">
+                    <i class="fa-solid fa-brain text-2xl"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-white">Ready for Semantic Matching</h3>
+                    <p class="text-xs text-slate-300">Execute LLM match scoring (1-10) with detailed evidence-backed justifications for uploaded candidates.</p>
+                </div>
+            </div>
+
+            <button onclick="runScreening()" id="screenBtn" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm px-6 py-3 rounded-xl shadow-lg shadow-indigo-600/40 transition flex items-center justify-center gap-2 whitespace-nowrap">
+                <i class="fa-solid fa-bolt-lightning text-yellow-300"></i> Run AI Match & Rank Shortlist
+            </button>
+        </div>
+
+        <!-- Shortlist Results Section -->
+        <div class="bg-slate-800 border border-slate-700/80 rounded-2xl p-6 shadow-xl space-y-6">
+            
+            <!-- Results Header & Filters -->
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-700/80 pb-4">
+                <div>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                        <i class="fa-solid fa-trophy text-amber-400"></i> Candidate Shortlist
+                    </h2>
+                    <p class="text-xs text-slate-400 mt-0.5" id="shortlistSubtitle">Ranked by semantic match score (1 - 10)</p>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-3">
+                    <!-- Search Input -->
+                    <div class="relative">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-500 text-xs"></i>
+                        <input type="text" id="searchInput" oninput="filterShortlist()" placeholder="Search candidates or skills..." class="bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-lg pl-8 pr-3 py-2 focus:ring-indigo-500 focus:border-indigo-500 w-48">
+                    </div>
+
+                    <!-- Min Score Filter -->
+                    <select id="scoreFilter" onchange="filterShortlist()" class="bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-lg p-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="0">All Scores (1 - 10)</option>
+                        <option value="8">Top Fit (≥ 8.0)</option>
+                        <option value="6">Good Fit (≥ 6.0)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Loader -->
+            <div id="loader" class="hidden py-12 text-center space-y-4">
+                <i class="fa-solid fa-circle-notch fa-spin text-4xl text-indigo-500"></i>
+                <p class="text-sm text-slate-300 font-medium animate-pulse">Parsing resumes and evaluating semantic fit with LLM...</p>
+            </div>
+
+            <!-- Shortlist Cards Container -->
+            <div id="shortlistContainer" class="space-y-4">
+                <div class="text-center py-12 text-slate-500">
+                    <i class="fa-solid fa-clipboard-check text-4xl mb-3 text-slate-600"></i>
+                    <p class="text-sm font-medium">No candidates screened for selected Job Description yet.</p>
+                    <p class="text-xs text-slate-600 mt-1">Upload resumes and click "Run AI Match & Rank Shortlist" to view results.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Breakdown Modal -->
+    <div id="breakdownModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b border-slate-700 flex justify-between items-center bg-slate-850">
+                <div class="flex items-center space-x-3">
+                    <div id="modalScoreBadge" class="px-3 py-1.5 rounded-xl font-bold text-base bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                        8.5 / 10
+                    </div>
+                    <div>
+                        <h3 id="modalCandidateName" class="text-lg font-bold text-white">Candidate Name</h3>
+                        <p id="modalFilename" class="text-xs text-slate-400">resume.pdf</p>
+                    </div>
+                </div>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-white text-xl p-1">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="p-6 overflow-y-auto space-y-6 text-sm">
+                <!-- Rationale Section -->
+                <div>
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-indigo-400 mb-2">Evaluation Rationale & Justification</h4>
+                    <p id="modalJustification" class="text-slate-200 text-xs leading-relaxed bg-slate-900 p-4 rounded-xl border border-slate-700/60"></p>
+                </div>
+
+                <!-- Pros & Cons Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-emerald-950/20 border border-emerald-500/20 p-4 rounded-xl">
+                        <h4 class="text-xs font-bold uppercase text-emerald-400 mb-2 flex items-center gap-1.5">
+                            <i class="fa-solid fa-circle-check"></i> Key Strengths (Pros)
+                        </h4>
+                        <ul id="modalPros" class="list-disc list-inside space-y-1 text-xs text-emerald-200"></ul>
+                    </div>
+
+                    <div class="bg-rose-950/20 border border-rose-500/20 p-4 rounded-xl">
+                        <h4 class="text-xs font-bold uppercase text-rose-400 mb-2 flex items-center gap-1.5">
+                            <i class="fa-solid fa-triangle-exclamation"></i> Gaps & Considerations (Cons)
+                        </h4>
+                        <ul id="modalCons" class="list-disc list-inside space-y-1 text-xs text-rose-200"></ul>
+                    </div>
+                </div>
+
+                <!-- Extracted Skills -->
+                <div>
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Extracted Candidate Skills</h4>
+                    <div id="modalSkills" class="flex flex-wrap gap-1.5"></div>
+                </div>
+
+                <!-- Work Experience -->
+                <div>
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Work Experience</h4>
+                    <div id="modalExperience" class="space-y-2"></div>
+                </div>
+
+                <!-- Education -->
+                <div>
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Education</h4>
+                    <div id="modalEducation" class="space-y-2"></div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-6 py-3 border-t border-slate-700 bg-slate-900 text-right">
+                <button onclick="closeModal()" class="bg-slate-700 hover:bg-slate-600 text-white text-xs px-4 py-2 rounded-lg font-medium">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Script -->
+    <script>
+        let selectedFiles = [];
+        let currentShortlist = [];
+        let currentJobId = null;
+
+        // Sample Job Description Preset
+        const SAMPLE_JD = {
+            title: "Senior Full Stack Software Engineer",
+            description: `We are looking for a Senior Full Stack Software Engineer with 4+ years of hands-on experience building scalable web applications.
+
+Key Responsibilities:
+- Design, build, and deploy RESTful APIs and microservices using Python (FastAPI / Django / Flask) or Node.js.
+- Architect modern frontend user interfaces with React, TypeScript, and modern CSS frameworks (Tailwind).
+- Work with relational databases (PostgreSQL / SQLite) and NoSQL stores (MongoDB).
+- Practice automated testing (pytest, Jest) and CI/CD pipeline automation with Docker and GitHub Actions.
+- Collaborate with product managers and UX designers in an Agile software development workflow.
+
+Required Qualifications:
+- Bachelor's degree in Computer Science, Software Engineering, or related technical field.
+- Proficiency in Python, JavaScript/TypeScript, React, Node.js, and SQL.
+- Solid understanding of software design patterns, system architecture, and API design.`
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchSavedJobs();
+            setupDropzone();
+        });
+
+        function setupDropzone() {
+            const dropzone = document.getElementById('dropzone');
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropzone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    dropzone.classList.add('border-indigo-500', 'bg-slate-900');
+                }, false);
+            });
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropzone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    dropzone.classList.remove('border-indigo-500', 'bg-slate-900');
+                }, false);
+            });
+            dropzone.addEventListener('drop', (e) => {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                handleFileSelect({ target: { files: files } });
+            });
+        }
+
+        function loadPresetJD() {
+            document.getElementById('jobTitle').value = SAMPLE_JD.title;
+            document.getElementById('jobText').value = SAMPLE_JD.description;
+            document.getElementById('jobStatusMsg').innerText = "Loaded sample job description preset.";
+        }
+
+        async function saveJobDescription() {
+            const title = document.getElementById('jobTitle').value.trim();
+            const text = document.getElementById('jobText').value.trim();
+            if (!title || !text) {
+                alert("Please provide both a Job Title and Description text.");
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/v1/jobs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title: title, description_text: text })
+                });
+                const data = await res.json();
+                currentJobId = data.id;
+                document.getElementById('jobStatusMsg').innerText = `Saved JD: "${data.title}"`;
+                await fetchSavedJobs(data.id);
+            } catch (err) {
+                alert("Error saving Job Description: " + err.message);
+            }
+        }
+
+        async function fetchSavedJobs(selectedId = null) {
+            try {
+                const res = await fetch('/api/v1/jobs');
+                const jobs = await res.json();
+                const select = document.getElementById('jobSelect');
+                select.innerHTML = '<option value="">-- Select Saved Job --</option>';
+                
+                jobs.forEach(job => {
+                    const opt = document.createElement('option');
+                    opt.value = job.id;
+                    opt.textContent = `${job.title} (${new Date(job.created_at).toLocaleDateString()})`;
+                    select.appendChild(opt);
+                });
+
+                if (selectedId) {
+                    select.value = selectedId;
+                    onJobSelected();
+                } else if (jobs.length > 0) {
+                    select.value = jobs[0].id;
+                    onJobSelected();
+                }
+            } catch (err) {
+                console.error("Error fetching jobs:", err);
+            }
+        }
+
+        async function onJobSelected() {
+            const select = document.getElementById('jobSelect');
+            const jobId = select.value;
+            if (!jobId) return;
+
+            currentJobId = jobId;
+            try {
+                const res = await fetch(`/api/v1/jobs/${jobId}`);
+                const job = await res.json();
+                document.getElementById('jobTitle').value = job.title;
+                document.getElementById('jobText').value = job.description_text;
+                document.getElementById('jobStatusMsg').innerText = `Active Job: ${job.title}`;
+                
+                // Fetch shortlist if already screened
+                fetchShortlist(jobId);
+            } catch (err) {
+                console.error("Error loading job detail:", err);
+            }
+        }
+
+        function handleFileSelect(e) {
+            const files = Array.from(e.target.files);
+            if (files.length === 0) return;
+
+            selectedFiles = files;
+            const container = document.getElementById('selectedFilesContainer');
+            const list = document.getElementById('selectedFilesList');
+            const uploadBtn = document.getElementById('uploadBtn');
+
+            container.classList.remove('hidden');
+            list.innerHTML = selectedFiles.map(f => `
+                <div class="flex items-center justify-between bg-slate-900/80 px-3 py-1.5 rounded-lg border border-slate-700">
+                    <span class="truncate max-w-xs font-mono text-xs"><i class="fa-regular fa-file-lines mr-2 text-indigo-400"></i>${f.name}</span>
+                    <span class="text-[10px] text-slate-500 font-mono">${(f.size/1024).toFixed(1)} KB</span>
+                </div>
+            `).join('');
+
+            uploadBtn.disabled = false;
+            uploadBtn.classList.remove('bg-slate-700');
+            uploadBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-500');
+            document.getElementById('uploadStatus').innerText = `${selectedFiles.length} file(s) selected`;
+        }
+
+        async function uploadResumes() {
+            if (selectedFiles.length === 0) return;
+
+            const formData = new FormData();
+            selectedFiles.forEach(f => formData.append('files', f));
+
+            const uploadBtn = document.getElementById('uploadBtn');
+            uploadBtn.disabled = true;
+            uploadBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Parsing...';
+
+            try {
+                const res = await fetch('/api/v1/resumes/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const candidates = await res.json();
+                document.getElementById('uploadStatus').innerText = `Successfully parsed ${candidates.length} resume(s)!`;
+                uploadBtn.innerHTML = '<i class="fa-solid fa-check"></i> Resumes Parsed';
+                uploadBtn.classList.replace('bg-indigo-600', 'bg-emerald-600');
+            } catch (err) {
+                alert("Upload failed: " + err.message);
+                uploadBtn.disabled = false;
+                uploadBtn.innerHTML = '<i class="fa-solid fa-file-import"></i> Retry Upload';
+            }
+        }
+
+        async function runScreening() {
+            if (!currentJobId) {
+                await saveJobDescription();
+                if (!currentJobId) {
+                    alert("Please select or save a Job Description first.");
+                    return;
+                }
+            }
+
+            const loader = document.getElementById('loader');
+            const container = document.getElementById('shortlistContainer');
+            loader.classList.remove('hidden');
+            container.classList.add('hidden');
+
+            try {
+                const res = await fetch('/api/v1/screen', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ job_id: currentJobId })
+                });
+
+                if (!res.ok) {
+                    const errData = await res.json();
+                    throw new Error(errData.detail || "Screening failed");
+                }
+
+                const data = await res.json();
+                currentShortlist = data.shortlist;
+                renderShortlist(currentShortlist);
+            } catch (err) {
+                alert("Screening Error: " + err.message);
+            } finally {
+                loader.classList.add('hidden');
+                container.classList.remove('hidden');
+            }
+        }
+
+        async function fetchShortlist(jobId) {
+            try {
+                const res = await fetch(`/api/v1/shortlist/${jobId}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    currentShortlist = data.shortlist;
+                    renderShortlist(currentShortlist);
+                }
+            } catch (err) {
+                console.error("Error fetching shortlist:", err);
+            }
+        }
+
+        function renderShortlist(items) {
+            const container = document.getElementById('shortlistContainer');
+            if (!items || items.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-12 text-slate-500">
+                        <i class="fa-solid fa-clipboard-check text-4xl mb-3 text-slate-600"></i>
+                        <p class="text-sm font-medium">No candidates screened for this job yet.</p>
+                        <p class="text-xs text-slate-600 mt-1">Upload resumes and click "Run AI Match & Rank Shortlist".</p>
+                    </div>`;
+                return;
+            }
+
+            container.innerHTML = items.map((item, idx) => {
+                const score = item.score;
+                let scoreColor = "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
+                if (score < 6.0) scoreColor = "bg-rose-500/20 text-rose-400 border-rose-500/30";
+                else if (score < 7.5) scoreColor = "bg-amber-500/20 text-amber-400 border-amber-500/30";
+
+                const matchingSkillsBadges = (item.matching_skills || []).slice(0, 5).map(s => 
+                    `<span class="bg-emerald-950/40 text-emerald-300 border border-emerald-500/20 text-[11px] px-2 py-0.5 rounded-md font-mono">${s}</span>`
+                ).join(' ');
+
+                const missingSkillsBadges = (item.missing_skills || []).slice(0, 3).map(s => 
+                    `<span class="bg-rose-950/40 text-rose-300 border border-rose-500/20 text-[11px] px-2 py-0.5 rounded-md font-mono">${s}</span>`
+                ).join(' ');
+
+                return `
+                    <div class="bg-slate-900 border border-slate-700/70 hover:border-indigo-500/50 rounded-xl p-5 transition shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                        <div class="flex items-start space-x-4 flex-1">
+                            <div class="text-slate-500 font-mono text-sm font-bold pt-1">#${idx + 1}</div>
+                            
+                            <div class="space-y-2 flex-1">
+                                <div class="flex items-center space-x-3">
+                                    <h3 class="font-bold text-white text-base">${item.candidate_name}</h3>
+                                    <span class="text-xs font-mono text-slate-500">(${item.filename})</span>
+                                </div>
+
+                                <p class="text-xs text-slate-300 line-clamp-2 leading-relaxed font-sans">
+                                    ${item.justification}
+                                </p>
+
+                                <div class="flex flex-wrap items-center gap-2 pt-1">
+                                    ${matchingSkillsBadges ? `<span class="text-[10px] uppercase font-bold text-emerald-400 mr-1">Matched:</span>${matchingSkillsBadges}` : ''}
+                                    ${missingSkillsBadges ? `<span class="text-[10px] uppercase font-bold text-rose-400 ml-2 mr-1">Missing:</span>${missingSkillsBadges}` : ''}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex md:flex-col items-center md:items-end justify-between w-full md:w-auto pt-3 md:pt-0 border-t md:border-t-0 border-slate-800 gap-3">
+                            <div class="px-4 py-2 rounded-xl text-lg font-bold border text-center ${scoreColor}">
+                                ${score.toFixed(1)} <span class="text-xs font-normal text-slate-400">/ 10</span>
+                            </div>
+                            
+                            <button onclick="openModal('${item.candidate_id}')" class="text-xs bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700 px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 whitespace-nowrap">
+                                <i class="fa-solid fa-eye"></i> View Full Rationale
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function filterShortlist() {
+            const query = document.getElementById('searchInput').value.lowerCase();
+            const minScore = parseFloat(document.getElementById('scoreFilter').value || 0);
+
+            const filtered = currentShortlist.filter(item => {
+                const matchesScore = item.score >= minScore;
+                const textSearch = (item.candidate_name + " " + item.justification + " " + (item.skills||[]).join(' ')).toLowerCase();
+                const matchesText = !query || textSearch.includes(query);
+                return matchesScore && matchesText;
+            });
+
+            renderShortlist(filtered);
+        }
+
+        function openModal(candidateId) {
+            const item = currentShortlist.find(i => i.candidate_id === candidateId);
+            if (!item) return;
+
+            document.getElementById('modalCandidateName').innerText = item.candidate_name;
+            document.getElementById('modalFilename').innerText = item.filename;
+            
+            const badge = document.getElementById('modalScoreBadge');
+            badge.innerText = `${item.score.toFixed(1)} / 10`;
+            if (item.score >= 7.5) {
+                badge.className = "px-3 py-1.5 rounded-xl font-bold text-base bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+            } else if (item.score >= 6.0) {
+                badge.className = "px-3 py-1.5 rounded-xl font-bold text-base bg-amber-500/20 text-amber-400 border border-amber-500/30";
+            } else {
+                badge.className = "px-3 py-1.5 rounded-xl font-bold text-base bg-rose-500/20 text-rose-400 border border-rose-500/30";
+            }
+
+            document.getElementById('modalJustification').innerText = item.justification;
+
+            // Pros & Cons
+            const prosList = document.getElementById('modalPros');
+            prosList.innerHTML = (item.pros || []).map(p => `<li>${p}</li>`).join('') || '<li class="text-slate-400">None highlighted</li>';
+
+            const consList = document.getElementById('modalCons');
+            consList.innerHTML = (item.cons || []).map(c => `<li>${c}</li>`).join('') || '<li class="text-slate-400">None highlighted</li>';
+
+            // Skills
+            const skillsBox = document.getElementById('modalSkills');
+            skillsBox.innerHTML = (item.skills || []).map(s => 
+                `<span class="bg-indigo-950/60 text-indigo-300 border border-indigo-500/30 text-xs px-2.5 py-1 rounded-md">${s}</span>`
+            ).join('') || '<span class="text-slate-500 text-xs">No skills listed</span>';
+
+            // Work Experience
+            const expBox = document.getElementById('modalExperience');
+            expBox.innerHTML = (item.experience || []).map(e => `
+                <div class="bg-slate-900 border border-slate-700/60 p-3 rounded-lg text-xs space-y-1">
+                    <div class="flex justify-between font-semibold text-slate-200">
+                        <span>${e.role || 'Role'} <span class="text-indigo-400">@ ${e.company || 'Company'}</span></span>
+                        <span class="text-slate-400 font-mono text-[11px]">${e.duration || ''}</span>
+                    </div>
+                    <p class="text-slate-400">${e.responsibilities || ''}</p>
+                </div>
+            `).join('') || '<p class="text-slate-500 text-xs">No work experience entries</p>';
+
+            // Education
+            const eduBox = document.getElementById('modalEducation');
+            eduBox.innerHTML = (item.education || []).map(e => `
+                <div class="bg-slate-900 border border-slate-700/60 p-3 rounded-lg text-xs flex justify-between items-center">
+                    <div>
+                        <span class="font-semibold text-slate-200">${e.degree || 'Degree'}</span>
+                        <span class="text-slate-400 block">${e.institution || 'Institution'}</span>
+                    </div>
+                    <span class="text-slate-400 font-mono text-[11px]">${e.year || ''}</span>
+                </div>
+            `).join('') || '<p class="text-slate-500 text-xs">No education entries</p>';
+
+            document.getElementById('breakdownModal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('breakdownModal').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>

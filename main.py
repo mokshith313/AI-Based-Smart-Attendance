@@ -440,23 +440,50 @@ def automatic_attendance():
     
 def manual_attendance():
     sbw = tk.Toplevel(window)
-    sbw.title("Manual Entry")
-    sbw.geometry("400x300")
+    sbw.title("Manual Attendance Entry")
+    sbw.geometry("460x380")
+    sbw.configure(bg="#0f172a")
+    sbw.resizable(False, False)
 
-    Label(sbw, text="Enrollment:").pack(pady=5)
-    en_entry = Entry(sbw)
-    en_entry.pack()
+    # Modal Header
+    tk.Label(
+        sbw, text="Manual Attendance", 
+        font=("Helvetica", 18, "bold"), fg="#f8fafc", bg="#0f172a"
+    ).pack(pady=(20, 4))
+    tk.Label(
+        sbw, text="Enter student details to log attendance directly", 
+        font=("Helvetica", 11), fg="#94a3b8", bg="#0f172a"
+    ).pack(pady=(0, 20))
 
-    Label(sbw, text="Name:").pack(pady=5)
-    nm_entry = Entry(sbw)
-    nm_entry.pack()
+    form_frame = tk.Frame(sbw, bg="#1e293b", padx=20, pady=20, relief="flat", highlightthickness=1, highlightbackground="#334155")
+    form_frame.pack(fill="x", padx=30)
+
+    tk.Label(
+        form_frame, text="Enrollment / Roll ID:", 
+        font=("Helvetica", 11, "bold"), fg="#cbd5e1", bg="#1e293b", anchor="w"
+    ).pack(fill="x", pady=(0, 4))
+    en_entry = Entry(
+        form_frame, font=("Helvetica", 13), bg="#0f172a", fg="#f8fafc", 
+        insertbackground="#38bdf8", relief="flat", highlightthickness=1, highlightbackground="#475569"
+    )
+    en_entry.pack(fill="x", ipady=6, pady=(0, 14))
+
+    tk.Label(
+        form_frame, text="Student Full Name:", 
+        font=("Helvetica", 11, "bold"), fg="#cbd5e1", bg="#1e293b", anchor="w"
+    ).pack(fill="x", pady=(0, 4))
+    nm_entry = Entry(
+        form_frame, font=("Helvetica", 13), bg="#0f172a", fg="#f8fafc", 
+        insertbackground="#38bdf8", relief="flat", highlightthickness=1, highlightbackground="#475569"
+    )
+    nm_entry.pack(fill="x", ipady=6, pady=(0, 10))
 
     def save_manual():
-        enrollment = en_entry.get()
-        name = nm_entry.get()
+        enrollment = en_entry.get().strip()
+        name = nm_entry.get().strip()
 
         if not enrollment or not name:
-            messagebox.showwarning("Warning", "All fields required!")
+            messagebox.showwarning("Warning", "Enrollment ID and Student Name are required!")
             return
 
         ts = time.time()
@@ -475,7 +502,7 @@ def manual_attendance():
         if os.path.getsize(fileName) > 0:
             df = pd.read_csv(fileName)
             if enrollment in df['Enrollment'].astype(str).values:
-                messagebox.showwarning("Duplicate", "Already marked today!")
+                messagebox.showwarning("Duplicate", f"Attendance for {enrollment} already marked today!")
                 return
 
         # Save attendance
@@ -483,11 +510,24 @@ def manual_attendance():
             writer = csv.writer(f)
             writer.writerow([enrollment, name, date, timeStamp])
 
-        messagebox.showinfo("Success", "Manual attendance saved")
+        Notification.configure(text=f"Manual Log: {name} Present", bg="#059669")
+        messagebox.showinfo("Success", f"Attendance recorded for {name} ({enrollment})")
         sbw.destroy()
 
-    #  IMPORTANT BUTTON (you missed earlier)
-    Button(sbw, text="Save", command=save_manual).pack(pady=20)
+    btn_frame = tk.Frame(sbw, bg="#0f172a")
+    btn_frame.pack(fill="x", padx=30, pady=20)
+
+    Button(
+        btn_frame, text="Save Attendance", command=save_manual, 
+        bg="#10b981", fg="white", font=("Helvetica", 12, "bold"), 
+        relief="flat", cursor="hand2", padx=20, pady=8
+    ).pack(side="left", expand=True, fill="x", padx=(0, 10))
+
+    Button(
+        btn_frame, text="Cancel", command=sbw.destroy, 
+        bg="#475569", fg="white", font=("Helvetica", 12), 
+        relief="flat", cursor="hand2", padx=20, pady=8
+    ).pack(side="right", expand=True, fill="x", padx=(10, 0))
 
 
 def on_closing():
@@ -556,41 +596,151 @@ window = tk.Tk()
 window.lift()                               # Moves window to the top
 window.attributes('-topmost', True)        # Keeps it there
 window.after_idle(window.attributes, '-topmost', False) # Allows other windows to move on top again
-window.title("FAMS-Face Recognition System")
-window.geometry('1280x720')
-window.configure(background='grey80')
+window.title("VisionAttend AI • Desktop Management Suite")
+window.geometry('1240x740')
+window.configure(background='#0b0f19')
 window.protocol("WM_DELETE_WINDOW", on_closing)
 
-Label(window, text="Attendance Management System", bg="black", fg="white", width=50, height=3, font=('times', 30, 'bold')).place(x=80, y=20)
-Notification = Label(window, text="Status: Ready", bg="Green", fg="white", width=30, height=2, font=('times', 17))
-Notification.place(x=450, y=400)
+# 1. Header Banner
+header_frame = tk.Frame(window, bg="#0f172a", highlightthickness=1, highlightbackground="#1e293b", pady=18, padx=30)
+header_frame.pack(fill="x", padx=28, pady=(20, 16))
 
-# --- Replace your current Entry boxes with these ---
+header_content = tk.Frame(header_frame, bg="#0f172a")
+header_content.pack(fill="x")
 
-Label(window, text="Enter Enrollment:", width=20, bg="grey", font=('times', 15, 'bold')).place(x=200, y=200)
+title_lbl = tk.Label(
+    header_content, text="VisionAttend AI 2.0", 
+    font=("Helvetica", 24, "bold"), fg="#38bdf8", bg="#0f172a"
+)
+title_lbl.pack(side="left")
 
-# Updated txt Entry
-txt = tk.Entry(window, width=20, bg="white", fg="black", 
-               insertbackground='black', 
-               font=('times', 25), highlightthickness=2)
-txt.place(x=400, y=210)
+subtitle_lbl = tk.Label(
+    header_content, text="  •  Automated Face Recognition & Attendance Suite", 
+    font=("Helvetica", 14), fg="#94a3b8", bg="#0f172a"
+)
+subtitle_lbl.pack(side="left", pady=(5, 0))
 
-Label(window, text="Enter Name:", width=20, bg="grey", font=('times', 15, 'bold')).place(x=200, y=300)
+engine_badge = tk.Label(
+    header_content, text="OpenCV LBPH Active", 
+    font=("Helvetica", 11, "bold"), fg="#10b981", bg="#064e3b", padx=12, pady=4
+)
+engine_badge.pack(side="right")
 
-# Updated txt2 Entry
-txt2 = tk.Entry(window, width=20, bg="white", fg="black", 
-                insertbackground='black', 
-                font=('times', 25), highlightthickness=2)
-txt2.place(x=400, y=310)
+# 2. Main Content Card (Student Input Form)
+main_card = tk.Frame(window, bg="#111827", highlightthickness=1, highlightbackground="#1e293b", padx=30, pady=24)
+main_card.pack(fill="x", padx=28, pady=(0, 16))
 
-Button(window, text="Clear", command=clear, fg="white", bg="black", width=10).place(x=950, y=210)
-Button(window, text="Clear", command=clear1, fg="white", bg="black", width=10).place(x=950, y=310)
+card_title = tk.Label(
+    main_card, text="Student Enrollment & Registration", 
+    font=("Helvetica", 16, "bold"), fg="#f8fafc", bg="#111827"
+)
+card_title.pack(anchor="w", pady=(0, 16))
 
-Button(window, text="Take Images", command=take_img, bg="SkyBlue1", width=20, height=3, font=('times', 15, 'bold')).place(x=90, y=500)
-Button(window, text="Train Images", command=trainimg, bg="SkyBlue1", width=20, height=3, font=('times', 15, 'bold')).place(x=390, y=500)
-Button(window, text="Automatic Attendance", command=automatic_attendance, bg="SkyBlue1", width=20, height=3, font=('times', 15, 'bold')).place(x=690, y=500)
-Button(window, text="Manual Attendance", command=manual_attendance, bg="SkyBlue1", width=20, height=3, font=('times', 15, 'bold')).place(x=90, y=620)
-Button(window, text="Quit System", command=on_closing, bg="red3", fg="white", width=20, height=3, font=('times', 15, 'bold')).place(x=690, y=620)
-tk.Button(window, text="View Attendance", command=view_attendance, 
-          bg="SkyBlue1", width=20, height=3, font=('times', 15, 'bold')).place(x=390, y=620)
+form_row1 = tk.Frame(main_card, bg="#111827")
+form_row1.pack(fill="x", pady=6)
+
+tk.Label(
+    form_row1, text="Enrollment ID:", 
+    font=("Helvetica", 13, "bold"), fg="#cbd5e1", bg="#111827", width=16, anchor="w"
+).pack(side="left")
+
+txt = tk.Entry(
+    form_row1, font=("Helvetica", 14), bg="#1e293b", fg="#f8fafc", 
+    insertbackground="#38bdf8", relief="flat", highlightthickness=1, highlightbackground="#334155"
+)
+txt.pack(side="left", fill="x", expand=True, ipady=6, padx=(0, 14))
+
+btn_clear1 = Button(
+    form_row1, text="Clear", command=clear, 
+    bg="#334155", fg="#f8fafc", font=("Helvetica", 11, "bold"), 
+    relief="flat", cursor="hand2", padx=18, pady=6
+)
+btn_clear1.pack(side="left")
+
+form_row2 = tk.Frame(main_card, bg="#111827")
+form_row2.pack(fill="x", pady=6)
+
+tk.Label(
+    form_row2, text="Student Name:", 
+    font=("Helvetica", 13, "bold"), fg="#cbd5e1", bg="#111827", width=16, anchor="w"
+).pack(side="left")
+
+txt2 = tk.Entry(
+    form_row2, font=("Helvetica", 14), bg="#1e293b", fg="#f8fafc", 
+    insertbackground="#38bdf8", relief="flat", highlightthickness=1, highlightbackground="#334155"
+)
+txt2.pack(side="left", fill="x", expand=True, ipady=6, padx=(0, 14))
+
+btn_clear2 = Button(
+    form_row2, text="Clear", command=clear1, 
+    bg="#334155", fg="#f8fafc", font=("Helvetica", 11, "bold"), 
+    relief="flat", cursor="hand2", padx=18, pady=6
+)
+btn_clear2.pack(side="left")
+
+# 3. Status Notification Bar
+status_frame = tk.Frame(window, bg="#0b0f19")
+status_frame.pack(fill="x", padx=28, pady=(4, 16))
+
+Notification = Label(
+    status_frame, text="System Status: Ready", 
+    bg="#1e293b", fg="#38bdf8", font=("Helvetica", 13, "bold"), 
+    padx=20, pady=10, relief="flat", highlightthickness=1, highlightbackground="#334155"
+)
+Notification.pack(fill="x")
+
+# 4. Action Command Buttons (Two-Row Structured Grid)
+actions_frame = tk.Frame(window, bg="#0b0f19")
+actions_frame.pack(fill="x", padx=28, pady=4)
+
+# Row 1: Dataset & AI Training
+row1_frame = tk.Frame(actions_frame, bg="#0b0f19")
+row1_frame.pack(fill="x", pady=6)
+
+btn_take = Button(
+    row1_frame, text="📷  Take Face Samples", command=take_img, 
+    bg="#2563eb", fg="white", font=("Helvetica", 13, "bold"), 
+    relief="flat", cursor="hand2", pady=14
+)
+btn_take.pack(side="left", expand=True, fill="x", padx=(0, 10))
+
+btn_train = Button(
+    row1_frame, text="🧠  Train AI Model", command=trainimg, 
+    bg="#7c3aed", fg="white", font=("Helvetica", 13, "bold"), 
+    relief="flat", cursor="hand2", pady=14
+)
+btn_train.pack(side="left", expand=True, fill="x", padx=10)
+
+btn_auto = Button(
+    row1_frame, text="⚡  Automatic Attendance", command=automatic_attendance, 
+    bg="#059669", fg="white", font=("Helvetica", 13, "bold"), 
+    relief="flat", cursor="hand2", pady=14
+)
+btn_auto.pack(side="left", expand=True, fill="x", padx=(10, 0))
+
+# Row 2: Attendance Records & Controls
+row2_frame = tk.Frame(actions_frame, bg="#0b0f19")
+row2_frame.pack(fill="x", pady=6)
+
+btn_manual = Button(
+    row2_frame, text="✍️  Manual Attendance", command=manual_attendance, 
+    bg="#334155", fg="white", font=("Helvetica", 13, "bold"), 
+    relief="flat", cursor="hand2", pady=14
+)
+btn_manual.pack(side="left", expand=True, fill="x", padx=(0, 10))
+
+btn_view = Button(
+    row2_frame, text="📋  View Today's Attendance", command=view_attendance, 
+    bg="#0284c7", fg="white", font=("Helvetica", 13, "bold"), 
+    relief="flat", cursor="hand2", pady=14
+)
+btn_view.pack(side="left", expand=True, fill="x", padx=10)
+
+btn_quit = Button(
+    row2_frame, text="✕  Quit System", command=on_closing, 
+    bg="#dc2626", fg="white", font=("Helvetica", 13, "bold"), 
+    relief="flat", cursor="hand2", pady=14
+)
+btn_quit.pack(side="left", expand=True, fill="x", padx=(10, 0))
+
 window.mainloop()

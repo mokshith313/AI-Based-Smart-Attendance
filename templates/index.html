@@ -3,18 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Smart Attendance System</title>
-    <meta name="description" content="AI-Based Automated Smart Attendance System with Real-Time Face Recognition">
+    <title>VisionAttend AI | Smart Face Recognition Attendance System</title>
+    <meta name="description" content="AI-Based Automated Smart Attendance System with Real-Time Face Recognition, LBPH Model Training, and Instant Analytics.">
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Font Awesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Stylesheet -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
+    <!-- Floating Toast Notification Stack -->
+    <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
     <div class="app-container">
         <!-- Top Header Navigation -->
         <header class="main-header">
@@ -23,17 +26,27 @@
                     <i class="fa-solid fa-user-shield"></i>
                 </div>
                 <div class="brand-text">
-                    <h1>VisionAttend <span>AI</span></h1>
-                    <p>Smart Face Recognition Attendance System</p>
+                    <h1>VisionAttend <span class="brand-badge">AI 2.0</span></h1>
+                    <p>Automated Real-Time Face Recognition & Smart Attendance Platform</p>
                 </div>
             </div>
 
             <div class="header-actions">
+                <!-- Live Digital Clock -->
+                <div class="header-clock" id="header-clock">
+                    <i class="fa-regular fa-clock"></i>
+                    <span id="clock-date">--/--/----</span>
+                    <span id="clock-time">00:00:00</span>
+                </div>
+
+                <!-- Live Status Pill -->
                 <div class="status-pill" id="system-status-pill">
                     <span class="pulse-dot green"></span>
                     <span id="system-status-text">System Active</span>
                 </div>
-                <button class="btn btn-outline" id="btn-refresh-stats">
+
+                <!-- Refresh Button -->
+                <button class="btn btn-outline" id="btn-refresh-stats" title="Refresh Dashboard Stats">
                     <i class="fa-solid fa-arrows-rotate"></i> Refresh
                 </button>
             </div>
@@ -48,6 +61,7 @@
                 <div class="stat-info">
                     <span class="stat-label">Registered Students</span>
                     <h3 class="stat-value" id="stat-registered-students">0</h3>
+                    <span class="stat-subtext">Active student profiles</span>
                 </div>
             </div>
 
@@ -58,6 +72,7 @@
                 <div class="stat-info">
                     <span class="stat-label">Present Today</span>
                     <h3 class="stat-value" id="stat-present-today">0</h3>
+                    <span class="stat-subtext">Verified attendance logs</span>
                 </div>
             </div>
 
@@ -68,6 +83,7 @@
                 <div class="stat-info">
                     <span class="stat-label">Trained Face Samples</span>
                     <h3 class="stat-value" id="stat-trained-samples">0</h3>
+                    <span class="stat-subtext">Dataset image frames</span>
                 </div>
             </div>
 
@@ -77,31 +93,34 @@
                 </div>
                 <div class="stat-info">
                     <span class="stat-label">AI Model Status</span>
-                    <h3 class="stat-value model-badge" id="stat-model-status">Loading...</h3>
+                    <h3 class="stat-value model-badge" id="stat-model-status">
+                        <i class="fa-solid fa-spinner fa-spin"></i> Checking...
+                    </h3>
+                    <span class="stat-subtext">OpenCV LBPH Engine</span>
                 </div>
             </div>
         </section>
 
         <!-- Navigation Tabs -->
-        <nav class="nav-tabs">
-            <button class="tab-btn active" data-tab="tab-recognition">
+        <nav class="nav-tabs" role="tablist">
+            <button class="tab-btn active" data-tab="tab-recognition" role="tab">
                 <i class="fa-solid fa-camera"></i> Live Attendance
             </button>
-            <button class="tab-btn" data-tab="tab-register">
+            <button class="tab-btn" data-tab="tab-register" role="tab">
                 <i class="fa-solid fa-user-plus"></i> Register Student
             </button>
-            <button class="tab-btn" data-tab="tab-manual">
+            <button class="tab-btn" data-tab="tab-manual" role="tab">
                 <i class="fa-solid fa-pen-to-square"></i> Manual Entry
             </button>
-            <button class="tab-btn" data-tab="tab-logs">
+            <button class="tab-btn" data-tab="tab-logs" role="tab">
                 <i class="fa-solid fa-table-list"></i> Attendance Logs
             </button>
-            <button class="tab-btn" data-tab="tab-students">
+            <button class="tab-btn" data-tab="tab-students" role="tab">
                 <i class="fa-solid fa-address-book"></i> Student Directory
             </button>
         </nav>
 
-        <!-- Notification Banner -->
+        <!-- Notification Banner (Maintained for backward compatibility) -->
         <div id="notification-banner" class="notification hidden">
             <span id="notification-text">System Ready</span>
             <button class="close-notif" id="btn-close-notif"><i class="fa-solid fa-xmark"></i></button>
@@ -115,31 +134,68 @@
                 <div class="grid-2col">
                     <div class="card camera-card">
                         <div class="card-header">
-                            <h2><i class="fa-solid fa-video"></i> Live Face Scanner</h2>
+                            <div>
+                                <h2><i class="fa-solid fa-video"></i> Live Face Scanner</h2>
+                                <p class="card-subtitle">Real-time HaarCascade face detection & LBPH identification</p>
+                            </div>
                             <div class="camera-controls">
                                 <button class="btn btn-primary" id="btn-toggle-cam">
                                     <i class="fa-solid fa-play"></i> Start Camera
                                 </button>
                             </div>
                         </div>
-                        <div class="camera-viewport">
-                            <video id="webcam-video" autoplay playsinline muted></video>
-                            <canvas id="overlay-canvas"></canvas>
-                            <div class="camera-placeholder" id="cam-placeholder">
-                                <i class="fa-solid fa-camera-retro"></i>
-                                <p>Click "Start Camera" to begin automated face recognition attendance</p>
+
+                        <!-- Camera Viewport with Cyberpunk HUD accents -->
+                        <div class="camera-viewport-wrap">
+                            <div class="camera-viewport" id="cam-viewport-container">
+                                <!-- HUD Tactical Corner Brackets -->
+                                <div class="hud-corner tl"></div>
+                                <div class="hud-corner tr"></div>
+                                <div class="hud-corner bl"></div>
+                                <div class="hud-corner br"></div>
+
+                                <!-- HUD Scanning Laser Bar -->
+                                <div class="hud-scanline"></div>
+
+                                <!-- Status Badges in Video Frame -->
+                                <div class="hud-live-badge inactive" id="hud-cam-status">
+                                    <span class="pulse-dot green"></span>
+                                    <span>CAM STANDBY</span>
+                                </div>
+                                <div class="hud-meta-badge" id="hud-meta-badge">
+                                    LBPH &bull; 600ms
+                                </div>
+
+                                <!-- Video & Overlay Canvas -->
+                                <video id="webcam-video" autoplay playsinline muted></video>
+                                <canvas id="overlay-canvas"></canvas>
+
+                                <!-- Standby Placeholder -->
+                                <div class="camera-placeholder" id="cam-placeholder">
+                                    <i class="fa-solid fa-expand"></i>
+                                    <h3>Scanner Offline</h3>
+                                    <p>Click "Start Camera" above to initiate continuous real-time face recognition attendance</p>
+                                </div>
                             </div>
                         </div>
+
                         <div class="camera-footer">
-                            <span class="live-tag"><i class="fa-solid fa-circle"></i> Live AI Recognition</span>
-                            <span class="info-text">Position face inside camera box to log attendance</span>
+                            <span class="live-tag">
+                                <i class="fa-solid fa-circle-dot"></i> Automated Sync Active
+                            </span>
+                            <span class="info-text">
+                                Faces detected 2+ times are automatically recorded for today
+                            </span>
                         </div>
                     </div>
 
                     <div class="card sidebar-card">
                         <div class="card-header">
-                            <h2><i class="fa-solid fa-bolt"></i> Real-time Detections</h2>
-                            <button class="btn btn-sm btn-outline" id="btn-train-model">
+                            <div>
+                                <h2><i class="fa-solid fa-bolt"></i> Real-time Feed</h2>
+                                <p class="card-subtitle">Live detection stream & confidence ratings</p>
+                            </div>
+                            <button class="btn btn-sm btn-outline" id="btn-train-model" title="Re-train recognition model">
                                 <i class="fa-solid fa-gears"></i> Retrain Model
                             </button>
                         </div>
@@ -147,14 +203,14 @@
                         <div class="recognition-feed" id="recognition-feed">
                             <div class="empty-state">
                                 <i class="fa-solid fa-face-smile"></i>
-                                <p>Start camera to see live recognition results here</p>
+                                <p>Start camera to view live detection logs and accuracy scores here</p>
                             </div>
                         </div>
 
                         <div class="card-section mt-auto">
-                            <h3><i class="fa-solid fa-clock-rotate-left"></i> Today's Live Attendance Feed</h3>
+                            <h3><i class="fa-solid fa-clock-rotate-left"></i> Today's Live Attendance Roll</h3>
                             <div class="mini-logs-list" id="mini-attendance-list">
-                                <p class="text-muted">No attendance marked yet today</p>
+                                <p class="text-muted text-center py-4">No attendance marked yet today</p>
                             </div>
                         </div>
                     </div>
@@ -166,22 +222,27 @@
                 <div class="grid-2col">
                     <div class="card">
                         <div class="card-header">
-                            <h2><i class="fa-solid fa-id-card"></i> Student Information</h2>
+                            <div>
+                                <h2><i class="fa-solid fa-id-card"></i> Student Registration</h2>
+                                <p class="card-subtitle">Create profile and capture 15 multi-angle face training samples</p>
+                            </div>
                         </div>
                         <form id="form-register-student" class="styled-form">
                             <div class="form-group">
-                                <label for="reg-enrollment">Enrollment / ID Number <span class="required">*</span></label>
-                                <input type="text" id="reg-enrollment" placeholder="e.g. 101, CS202401" required>
+                                <label for="reg-enrollment">Enrollment / Roll ID <span class="required">*</span></label>
+                                <input type="text" id="reg-enrollment" placeholder="e.g. 101, CS2026-042" required autocomplete="off">
+                                <span class="input-hint">Unique identifier for student record</span>
                             </div>
 
                             <div class="form-group">
-                                <label for="reg-name">Full Student Name <span class="required">*</span></label>
-                                <input type="text" id="reg-name" placeholder="e.g. Mokshith Reddy" required>
+                                <label for="reg-name">Student Full Name <span class="required">*</span></label>
+                                <input type="text" id="reg-name" placeholder="e.g. Mokshith Reddy" required autocomplete="off">
+                                <span class="input-hint">Official student full name</span>
                             </div>
 
                             <div class="capture-progress-container hidden" id="capture-progress-wrap">
                                 <div class="progress-info">
-                                    <span>Capturing Face Samples...</span>
+                                    <span><i class="fa-solid fa-circle-notch fa-spin"></i> Capturing Face Samples...</span>
                                     <strong id="capture-count-text">0 / 15</strong>
                                 </div>
                                 <div class="progress-bar-bg">
@@ -202,17 +263,23 @@
 
                     <div class="card">
                         <div class="card-header">
-                            <h2><i class="fa-solid fa-camera-rotate"></i> Face Capture Preview</h2>
+                            <div>
+                                <h2><i class="fa-solid fa-camera-rotate"></i> Face Capture Preview</h2>
+                                <p class="card-subtitle">Position face centered inside the frame</p>
+                            </div>
                         </div>
-                        <div class="camera-viewport small">
-                            <video id="reg-webcam-video" autoplay playsinline muted></video>
-                            <div class="camera-placeholder" id="reg-cam-placeholder">
-                                <i class="fa-solid fa-user-viewfinder"></i>
-                                <p>Click "Open Camera" to capture student training photos</p>
+                        <div class="camera-viewport-wrap">
+                            <div class="camera-viewport small">
+                                <video id="reg-webcam-video" autoplay playsinline muted></video>
+                                <div class="camera-placeholder" id="reg-cam-placeholder">
+                                    <i class="fa-solid fa-user-viewfinder"></i>
+                                    <h3>Camera Inactive</h3>
+                                    <p>Click "Open Camera" to begin capturing training photos</p>
+                                </div>
                             </div>
                         </div>
                         <div class="captured-grid" id="captured-thumbnails">
-                            <!-- Thumbnails of captured face samples appear here -->
+                            <!-- Thumbnails of captured face samples will appear here -->
                         </div>
                     </div>
                 </div>
@@ -222,16 +289,21 @@
             <div class="tab-panel" id="tab-manual">
                 <div class="card max-w-600 center-card">
                     <div class="card-header">
-                        <h2><i class="fa-solid fa-user-pen"></i> Mark Manual Attendance</h2>
+                        <div>
+                            <h2><i class="fa-solid fa-user-pen"></i> Manual Attendance Entry</h2>
+                            <p class="card-subtitle">Log student attendance without webcam facial verification</p>
+                        </div>
                     </div>
                     <form id="form-manual-attendance" class="styled-form">
                         <div class="form-group">
                             <label for="man-enrollment">Enrollment Number <span class="required">*</span></label>
-                            <input type="text" id="man-enrollment" placeholder="Enter Enrollment ID" required>
+                            <input type="text" id="man-enrollment" placeholder="Enter Enrollment ID" required autocomplete="off">
+                            <span class="input-hint">Must match student's registered enrollment ID</span>
                         </div>
                         <div class="form-group">
                             <label for="man-name">Student Name <span class="required">*</span></label>
-                            <input type="text" id="man-name" placeholder="Enter Student Name" required>
+                            <input type="text" id="man-name" placeholder="Enter Full Name" required autocomplete="off">
+                            <span class="input-hint">Student full name as recorded in directory</span>
                         </div>
                         <button type="submit" class="btn btn-primary btn-block">
                             <i class="fa-solid fa-check"></i> Submit Manual Attendance
@@ -243,12 +315,27 @@
             <!-- TAB 4: Attendance Logs -->
             <div class="tab-panel" id="tab-logs">
                 <div class="card">
-                    <div class="card-header flex-between">
-                        <h2><i class="fa-solid fa-table-list"></i> Attendance Records</h2>
+                    <div class="card-header">
+                        <div>
+                            <h2><i class="fa-solid fa-table-list"></i> Daily Attendance Records</h2>
+                            <p class="card-subtitle">View, search, and export attendance logs</p>
+                        </div>
+                        <div class="records-count-chip" id="logs-count-chip">
+                            0 Records
+                        </div>
+                    </div>
+
+                    <!-- Filter & Real-Time Search Bar -->
+                    <div class="table-toolbar">
+                        <div class="search-box">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="input-search-logs" class="search-input" placeholder="Search by student name or enrollment ID..." autocomplete="off">
+                        </div>
+
                         <div class="filter-actions">
                             <input type="date" id="attendance-date-picker" class="input-date">
                             <button class="btn btn-outline" id="btn-fetch-logs">
-                                <i class="fa-solid fa-filter"></i> View Date
+                                <i class="fa-solid fa-filter"></i> Filter Date
                             </button>
                             <button class="btn btn-success" id="btn-export-csv">
                                 <i class="fa-solid fa-file-csv"></i> Export CSV
@@ -260,7 +347,7 @@
                         <table class="data-table" id="table-attendance">
                             <thead>
                                 <tr>
-                                    <th>#</th>
+                                    <th style="width: 60px;">#</th>
                                     <th>Enrollment</th>
                                     <th>Student Name</th>
                                     <th>Date</th>
@@ -281,22 +368,38 @@
             <!-- TAB 5: Student Directory -->
             <div class="tab-panel" id="tab-students">
                 <div class="card">
-                    <div class="card-header flex-between">
-                        <h2><i class="fa-solid fa-users"></i> Registered Students Directory</h2>
-                        <button class="btn btn-primary" id="btn-train-model-sec">
-                            <i class="fa-solid fa-brain"></i> Train AI Recognition Model
-                        </button>
+                    <div class="card-header">
+                        <div>
+                            <h2><i class="fa-solid fa-users"></i> Registered Student Directory</h2>
+                            <p class="card-subtitle">Complete roster of enrolled students and registration timestamps</p>
+                        </div>
+                        <div class="filter-actions">
+                            <div class="records-count-chip" id="students-count-chip">
+                                0 Students
+                            </div>
+                            <button class="btn btn-primary" id="btn-train-model-sec">
+                                <i class="fa-solid fa-brain"></i> Train AI Recognition Model
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Directory Search Bar -->
+                    <div class="table-toolbar">
+                        <div class="search-box">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="input-search-students" class="search-input" placeholder="Filter directory by student name or enrollment..." autocomplete="off">
+                        </div>
                     </div>
 
                     <div class="table-responsive">
                         <table class="data-table" id="table-students">
                             <thead>
                                 <tr>
-                                    <th>#</th>
+                                    <th style="width: 60px;">#</th>
                                     <th>Enrollment</th>
                                     <th>Student Name</th>
                                     <th>Registration Date</th>
-                                    <th>Time</th>
+                                    <th>Timestamp</th>
                                 </tr>
                             </thead>
                             <tbody id="tbody-students">
